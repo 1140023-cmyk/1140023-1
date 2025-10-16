@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>森林裡的99夜</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation; /* 禁用雙擊縮放 */
+        }
+        .action-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .action-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
+        }
+        #game-container {
+            max-width: 800px;
+            min-height: 95vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .log-entry {
+            border-left: 3px solid transparent;
+            padding-left: 10px;
+        }
+        .log-entry.day-start {
+            border-left-color: #FBBF24; /* amber-400 */
+            font-weight: bold;
+        }
+        .log-entry.danger {
+             border-left-color: #F87171; /* red-400 */
+        }
+        .log-entry.success {
+             border-left-color: #4ADE80; /* green-400 */
+        }
+        .log-entry.info {
+             border-left-color: #60A5FA; /* blue-400 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 flex flex-col">
+
+        <!-- 遊戲標題與天數 -->
+        <div class="text-center mb-4 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl md:text-4xl font-bold text-emerald-400">森林裡的99夜</h1>
+            <p id="day-counter" class="text-xl text-amber-300 font-semibold mt-2">第 1 天</p>
+        </div>
+
+        <!-- 遊戲主畫面與日誌 -->
+        <div id="log-container" class="flex-grow bg-gray-900/50 rounded-lg p-4 mb-4 overflow-y-auto h-64 md:h-80 shadow-inner">
+            <!-- 遊戲日誌會顯示在這裡 -->
+        </div>
+
+        <!-- 玩家狀態 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- 健康 -->
+            <div>
+                <label for="health" class="text-sm font-bold text-gray-300">健康</label>
+                <div class="w-full bg-red-900 rounded-full h-6 shadow-md">
+                    <div id="health-bar" class="bg-red-500 h-6 rounded-full text-xs font-medium text-red-100 text-center p-0.5 leading-none progress-bar-fill" style="width: 100%">100%</div>
+                </div>
+            </div>
+            <!-- 飢餓 -->
+            <div>
+                <label for="hunger" class="text-sm font-bold text-gray-300">飢餓</label>
+                <div class="w-full bg-orange-900 rounded-full h-6 shadow-md">
+                    <div id="hunger-bar" class="bg-orange-500 h-6 rounded-full text-xs font-medium text-orange-100 text-center p-0.5 leading-none progress-bar-fill" style="width: 100%">100%</div>
+                </div>
+            </div>
+             <!-- 精力 -->
+            <div>
+                <label for="energy" class="text-sm font-bold text-gray-300">精力</label>
+                <div class="w-full bg-blue-900 rounded-full h-6 shadow-md">
+                    <div id="energy-bar" class="bg-blue-500 h-6 rounded-full text-xs font-medium text-blue-100 text-center p-0.5 leading-none progress-bar-fill" style="width: 100%">100%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 資源顯示 -->
+        <div class="mb-6 p-4 bg-gray-700/50 rounded-lg text-center">
+            <h3 class="text-lg font-bold mb-2 text-gray-300">我的資源</h3>
+            <div id="resources" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-amber-200">
+                <p>木材: <span id="wood-count">0</span></p>
+                <p>食物: <span id="food-count">2</span></p>
+                <p>草藥: <span id="herb-count">0</span></p>
+                <p>石塊: <span id="stone-count">0</span></p>
+            </div>
+            <div id="tools" class="mt-2 text-cyan-300">
+                <p>工具: <span id="tool-status">無</span></p>
+                <p>庇護所: <span id="shelter-status">無</span></p>
+            </div>
+        </div>
+
+        <!-- 玩家動作 -->
+        <div id="actions-container" class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <button onclick="performAction('scout')" class="action-button bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg">探索周遭 (-10 精力)</button>
+            <button onclick="performAction('forage')" class="action-button bg-lime-600 hover:bg-lime-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg">採集食物 (-15 精力)</button>
+            <button onclick="performAction('rest')" class="action-button bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg">休息 (+40 精力)</button>
+            <button onclick="performAction('craft')" class="action-button bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg">製作物品 (-20 精力)</button>
+        </div>
+
+        <!-- 遊戲結束畫面 -->
+        <div id="game-over-screen" class="hidden text-center flex-col items-center justify-center flex-grow">
+            <h2 id="game-over-title" class="text-5xl font-bold text-red-500 mb-4">遊戲結束</h2>
+            <p id="game-over-message" class="text-xl mb-8">你在森林中沒能存活下來...</p>
+            <button onclick="restartGame()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg text-2xl">重新開始</button>
+        </div>
+        
+        <!-- 製作選單 -->
+        <div id="crafting-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-4">要製作什麼？</h2>
+                <div id="crafting-options" class="space-y-3">
+                    <!-- 製作選項會動態生成 -->
+                </div>
+                <button onclick="closeCraftingModal()" class="mt-6 w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">關閉</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 遊戲狀態物件
+        let gameState = {};
+
+        const logContainer = document.getElementById('log-container');
+
+        // 初始化遊戲
+        function initGame() {
+            gameState = {
+                day: 1,
+                health: 100,
+                hunger: 100,
+                energy: 100,
+                resources: {
+                    wood: 0,
+                    food: 2,
+                    herb: 0,
+                    stone: 0
+                },
+                tools: {
+                    axe: false,
+                    spear: false
+                },
+                shelter: false,
+                gameOver: false,
+                victory: false,
+                isNight: false,
+            };
+        }
+        
+        // 更新UI顯示
+        function updateUI() {
+            document.getElementById('day-counter').textContent = `第 ${gameState.day} 天`;
+            
+            // 更新狀態條
+            document.getElementById('health-bar').style.width = gameState.health + '%';
+            document.getElementById('health-bar').textContent = Math.round(gameState.health) + '%';
+            document.getElementById('hunger-bar').style.width = gameState.hunger + '%';
+            document.getElementById('hunger-bar').textContent = Math.round(gameState.hunger) + '%';
+            document.getElementById('energy-bar').style.width = gameState.energy + '%';
+            document.getElementById('energy-bar').textContent = Math.round(gameState.energy) + '%';
+
+            // 更新資源
+            document.getElementById('wood-count').textContent = gameState.resources.wood;
+            document.getElementById('food-count').textContent = gameState.resources.food;
+            document.getElementById('herb-count').textContent = gameState.resources.herb;
+            document.getElementById('stone-count').textContent = gameState.resources.stone;
+
+            // 更新工具和庇護所
+            let toolStatus = [];
+            if (gameState.tools.axe) toolStatus.push('斧頭');
+            if (gameState.tools.spear) toolStatus.push('長矛');
+            document.getElementById('tool-status').textContent = toolStatus.length > 0 ? toolStatus.join(', ') : '無';
+            document.getElementById('shelter-status').textContent = gameState.shelter ? '簡易木屋' : '無';
+        }
+
+        // 記錄遊戲日誌
+        function log(message, type = 'info') {
+            const entry = document.createElement('p');
+            entry.textContent = message;
+            entry.className = `log-entry mb-1 text-sm ${type}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // 玩家動作
+        function performAction(action) {
+            if (gameState.gameOver || gameState.victory) return;
+
+            let energyCost = 0;
+            let canAct = true;
+
+            switch(action) {
+                case 'scout':
+                    energyCost = 10;
+                    if (gameState.energy >= energyCost) {
+                        gameState.energy -= energyCost;
+                        log("你開始在附近探索...", 'info');
+                        handleScoutEvent();
+                    } else {
+                        canAct = false;
+                    }
+                    break;
+                case 'forage':
+                    energyCost = 15;
+                    if (gameState.energy >= energyCost) {
+                        gameState.energy -= energyCost;
+                        log("你花費時間尋找食物...", 'info');
+                        handleForageEvent();
+                    } else {
+                        canAct = false;
+                    }
+                    break;
+                case 'rest':
+                    if (gameState.energy < 100) {
+                        const energyGain = Math.min(40, 100 - gameState.energy);
+                        gameState.energy += energyGain;
+                        gameState.hunger -= 5;
+                        log(`你稍作休息，恢復了 ${Math.round(energyGain)} 點精力。`, 'success');
+                    } else {
+                        log("你的精力充沛，不需要休息。", 'info');
+                    }
+                    break;
+                case 'craft':
+                     energyCost = 20;
+                     if (gameState.energy >= energyCost) {
+                        openCraftingModal();
+                    } else {
+                       canAct = false;
+                    }
+                    break;
+            }
+
+            if (!canAct) {
+                log("你的精力不足，無法進行此活動。", 'danger');
+            }
+            
+            updateStatus();
+            if (action !== 'rest' && action !== 'craft' && canAct) {
+                // 每次行動後機率性觸發前進到夜晚
+                if (Math.random() < 0.4) {
+                    endDay();
+                }
+            }
+        }
+
+        function handleScoutEvent() {
+            const roll = Math.random();
+            if (roll < 0.3) {
+                log("你發現了一些堅固的石塊。", 'success');
+                gameState.resources.stone += 2;
+            } else if (roll < 0.6) {
+                const woodFound = gameState.tools.axe ? 5 : 2;
+                log(`你找到了一些木材。`, 'success');
+                gameState.resources.wood += woodFound;
+            } else if (roll < 0.8) {
+                log("你發現了一些看起來可以治傷的草藥。", 'success');
+                gameState.resources.herb += 1;
+            } else {
+                log("探索沒有任何發現，森林依舊神秘。", 'info');
+            }
+        }
+
+        function handleForageEvent() {
+             const roll = Math.random();
+            if (roll < 0.6) {
+                log("你找到了一些可食用的漿果！", 'success');
+                gameState.resources.food += 2;
+            } else if (roll < 0.8) {
+                log("你在樹根下發現了幾個蘑菇。", 'success');
+                gameState.resources.food += 1;
+            } else {
+                log("你找了半天，什麼吃的也沒找到。", 'info');
+            }
+        }
+
+        function openCraftingModal() {
+            const optionsContainer = document.getElementById('crafting-options');
+            optionsContainer.innerHTML = ''; // 清空舊選項
+
+            const craftingRecipes = [
+                { id: 'axe', name: '石斧 (需要 3 木材, 2 石塊)', wood: 3, stone: 2, condition: !gameState.tools.axe },
+                { id: 'shelter', name: '簡易木屋 (需要 10 木材, 2 石塊)', wood: 10, stone: 2, condition: !gameState.shelter },
+                { id: 'heal', name: '使用草藥 (需要 1 草藥)', herb: 1, condition: gameState.resources.herb > 0 && gameState.health < 100 },
+                { id: 'eat', name: '吃食物 (需要 1 食物)', food: 1, condition: gameState.resources.food > 0 && gameState.hunger < 100 },
+            ];
+            
+            craftingRecipes.forEach(recipe => {
+                if(recipe.condition) {
+                    const canCraft = (gameState.resources.wood >= (recipe.wood || 0)) &&
+                                     (gameState.resources.stone >= (recipe.stone || 0)) &&
+                                     (gameState.resources.herb >= (recipe.herb || 0)) &&
+                                     (gameState.resources.food >= (recipe.food || 0));
+
+                    const button = document.createElement('button');
+                    button.textContent = recipe.name;
+                    button.onclick = () => craftItem(recipe.id);
+                    button.className = `w-full text-white font-bold py-2 px-4 rounded ${canCraft ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-500 cursor-not-allowed'}`;
+                    if(!canCraft) {
+                        button.disabled = true;
+                    }
+                    optionsContainer.appendChild(button);
+                }
+            });
+
+            if (optionsContainer.childElementCount === 0) {
+                 optionsContainer.innerHTML = '<p class="text-gray-400 text-center">目前沒有可製作或使用的項目。</p>';
+            }
+
+            document.getElementById('crafting-modal').classList.remove('hidden');
+        }
+
+        function closeCraftingModal() {
+            document.getElementById('crafting-modal').classList.add('hidden');
+        }
+
+        function craftItem(itemId) {
+            gameState.energy -= 20; // 製作消耗精力
+            
+            switch(itemId) {
+                case 'axe':
+                    gameState.resources.wood -= 3;
+                    gameState.resources.stone -= 2;
+                    gameState.tools.axe = true;
+                    log("你用石頭和木頭做了一把簡易的石斧！", 'success');
+                    break;
+                case 'shelter':
+                    gameState.resources.wood -= 10;
+                    gameState.resources.stone -= 2;
+                    gameState.shelter = true;
+                    log("你建造了一個可以遮風避雨的簡易木屋！", 'success');
+                    break;
+                case 'heal':
+                    gameState.resources.herb -= 1;
+                    const healthGain = Math.min(30, 100 - gameState.health);
+                    gameState.health += healthGain;
+                    log(`你使用了草藥，恢復了 ${Math.round(healthGain)} 點健康。`, 'success');
+                    break;
+                case 'eat':
+                    gameState.resources.food -= 1;
+                    const hungerGain = Math.min(40, 100 - gameState.hunger);
+                    gameState.hunger += hungerGain;
+                    log(`你吃了一些食物，恢復了 ${Math.round(hungerGain)} 點飽食度。`, 'success');
+                    break;
+            }
+            closeCraftingModal();
+            updateStatus();
+            
+            // 製作後也可能進入夜晚
+            if (Math.random() < 0.4) {
+                endDay();
+            }
+        }
+        
+        // 更新狀態並檢查遊戲是否結束
+        function updateStatus() {
+            gameState.health = Math.max(0, Math.min(100, gameState.health));
+            gameState.hunger = Math.max(0, Math.min(100, gameState.hunger));
+            gameState.energy = Math.max(0, Math.min(100, gameState.energy));
+            
+            if (gameState.health <= 0) {
+                gameOver("你的健康耗盡了。");
+            } else if (gameState.hunger <= 0) {
+                 gameOver("你因為飢餓而倒下。");
+            }
+            
+            updateUI();
+        }
+
+        function endDay() {
+            if (gameState.gameOver || gameState.victory) return;
+
+            log("夜幕降臨...", 'day-start');
+            gameState.isNight = true;
+
+            // 夜間事件
+            handleNightEvent();
+            
+            // 結算當天狀態
+            let hungerLoss = 15;
+            if (gameState.shelter) {
+                hungerLoss = 10;
+                log("庇護所讓你睡得比較安穩。", 'info');
+            }
+            gameState.hunger -= hungerLoss;
+            
+            // 如果飢餓過低，會扣健康
+            if (gameState.hunger < 20) {
+                gameState.health -= 10;
+                log("飢腸轆轆讓你感到虛弱。",'danger')
+            }
+
+            updateStatus();
+            
+            setTimeout(() => {
+                if (!gameState.gameOver) {
+                    startNewDay();
+                }
+            }, 2000); // 等待2秒後開始新的一天
+        }
+
+        function handleNightEvent() {
+            const roll = Math.random();
+            let safeBonus = gameState.shelter ? 0.2 : 0;
+
+            if (roll > 0.6 + safeBonus) {
+                log("夜晚，森林裡傳來奇怪的聲響，你整夜沒睡好。", 'danger');
+                gameState.energy -= 20;
+                gameState.health -= 5;
+            } else if (roll > 0.3 + safeBonus) {
+                 log("一個平靜的夜晚過去了。", 'info');
+            } else {
+                 log("你在睡夢中感到身體恢復得很好。", 'success');
+                 gameState.health = Math.min(100, gameState.health + 5);
+            }
+        }
+
+        function startNewDay() {
+            gameState.day++;
+            if (gameState.day > 99) {
+                victory();
+                return;
+            }
+
+            gameState.isNight = false;
+            gameState.energy = 100; // 新的一天，精力恢復
+            log(`第 ${gameState.day} 天的太陽升起了。`, 'day-start');
+            
+            updateStatus();
+        }
+
+        function gameOver(message) {
+            gameState.gameOver = true;
+            document.getElementById('actions-container').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('game-over-message').textContent = message;
+        }
+        
+        function victory() {
+            gameState.victory = true;
+            document.getElementById('actions-container').classList.add('hidden');
+            const gameOverScreen = document.getElementById('game-over-screen');
+            gameOverScreen.classList.remove('hidden');
+            document.getElementById('game-over-title').textContent = "恭喜你！";
+            document.getElementById('game-over-title').classList.remove('text-red-500');
+            document.getElementById('game-over-title').classList.add('text-green-500');
+            document.getElementById('game-over-message').textContent = "你成功在森林中生存了99夜，迎來了第100天的曙光！";
+        }
+        
+        function restartGame() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('actions-container').classList.remove('hidden');
+            logContainer.innerHTML = '';
+            initGame();
+            log("你在一片陌生的森林中醒來，四周只有蟲鳴鳥叫...", 'day-start');
+            log("你的目標是：活下去，直到第100天。", 'info');
+            updateUI();
+        }
+
+        // 遊戲開始
+        window.onload = () => {
+           restartGame();
+        };
+
+    </script>
+</body>
+</html>
